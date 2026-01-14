@@ -1,39 +1,42 @@
 name: Defi Workflow
 
 on:
-  push:
-    branches: [dev]
   workflow_dispatch:
+  push:
+    branches: ["dev"]
+    paths-ignore:
+      - "**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # 1. Setup Env
   setup-env:
     name: Setup Env
     runs-on: ubuntu-latest
     outputs:
       node_versions: ${{ steps.set.outputs.node_versions }}
       precheck_lanes: ${{ steps.set.outputs.precheck_lanes }}
+      dev_test_lanes: ${{ steps.set.outputs.dev_test_lanes }}
+      uat_validation_lanes: ${{ steps.set.outputs.uat_validation_lanes }}
     steps:
-      - name: Setup env placeholders
+      - name: Setup placeholders
         run: |
           echo "Setup Env"
           echo "Branch: $GITHUB_REF"
           echo "Commit: $GITHUB_SHA"
 
-      # Single source of truth for all matrix values (DRY).
       - id: set
         name: Define matrices
         run: |
           echo 'node_versions=["20.x"]' >> "$GITHUB_OUTPUT"
           echo 'precheck_lanes=["upload-static-to-s3","linting","dependency-package-check","unit-test-coverage","db-integration-test"]' >> "$GITHUB_OUTPUT"
+          echo 'dev_test_lanes=["smoke-test-postman","api-e2e-test"]' >> "$GITHUB_OUTPUT"
+          echo 'uat_validation_lanes=["performance-test","apm-test"]' >> "$GITHUB_OUTPUT"
 
-  # 2. Parallel prechecks block (each item is its own matrix lane)
-  prechecks-parallel:
-    name: Prechecks (Parallel)
+  prechecks:
+    name: Parallel Prechecks
     runs-on: ubuntu-latest
     needs: setup-env
     strategy:
@@ -42,155 +45,139 @@ jobs:
         node-version: ${{ fromJSON(needs.setup-env.outputs.node_versions) }}
         lane: ${{ fromJSON(needs.setup-env.outputs.precheck_lanes) }}
     steps:
+      - name: Checkout
+        run: echo "Checkout repository"
+
+      - name: Setup Node
+        run: echo "Setup Node ${{ matrix.node-version }}"
+
       - name: Lane banner
         run: |
-          echo "Precheck lane: ${{ matrix.lane }}"
+          echo "Parallel Prechecks"
+          echo "Lane: ${{ matrix.lane }}"
           echo "Node: ${{ matrix.node-version }}"
 
-      - name: Upload Static Asset to S3 (template)
+      - name: Upload Static Asset to S3
         if: ${{ matrix.lane == 'upload-static-to-s3' }}
         run: |
           echo "Upload Static Asset to S3"
-          echo "Template only. No AWS credentials yet"
-          echo "Later: aws s3 sync <local_dir> s3://<bucket>/<prefix> --delete"
+          echo "Template only"
 
-      - name: Linting (template)
+      - name: Linting
         if: ${{ matrix.lane == 'linting' }}
         run: |
           echo "Linting"
           echo "Template only"
-          echo "Later: npm ci"
-          echo "Later: npm run lint"
 
-      - name: Dependency package Check (template)
+      - name: Dependency package Check
         if: ${{ matrix.lane == 'dependency-package-check' }}
         run: |
           echo "Dependency package Check"
           echo "Template only"
-          echo "Later: npm ci"
-          echo "Later: npm audit --audit-level=high"
 
-      - name: Unit Test Coverage (template)
+      - name: Unit Test Coverage
         if: ${{ matrix.lane == 'unit-test-coverage' }}
         run: |
           echo "Unit Test Coverage"
           echo "Template only"
-          echo "Later: npm ci"
-          echo "Later: npm run test:unit"
-          echo "Later: npm run test:coverage"
 
-      - name: DB Integration Test (template)
+      - name: DB Integration Test
         if: ${{ matrix.lane == 'db-integration-test' }}
         run: |
           echo "DB Integration Test"
           echo "Template only"
-          echo "Later: start DB service"
-          echo "Later: npm run test:db"
 
-  # 3. Build
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: prechecks-parallel
+    needs: prechecks
     steps:
-      - name: Build (template)
+      - name: Build
         run: |
           echo "Build"
           echo "Template only"
-          echo "Later: npm ci"
-          echo "Later: npm run build"
 
-  # 4. Deploy To Dev
   deploy-dev:
     name: Deploy To Dev
     runs-on: ubuntu-latest
     needs: build
     environment: dev
     steps:
-      - name: Deploy To Dev (template)
+      - name: Deploy To Dev
         run: |
           echo "Deploy To Dev"
           echo "Template only"
-          echo "Later: deploy commands"
 
-  # 5. Parallel: Smoke Test Postman + API e2e Test
-  dev-tests-parallel:
-    name: Dev Tests (Parallel)
+  dev-tests:
+    name: Parallel Dev Tests
     runs-on: ubuntu-latest
     needs: deploy-dev
     strategy:
       fail-fast: false
       matrix:
-        lane: [smoke-test-postman, api-e2e-test]
+        lane: ${{ fromJSON(needs.setup-env.outputs.dev_test_lanes) }}
     steps:
       - name: Lane banner
         run: |
-          echo "Dev test lane: ${{ matrix.lane }}"
+          echo "Parallel Dev Tests"
+          echo "Lane: ${{ matrix.lane }}"
 
-      - name: Smoke Test Postman (template)
+      - name: Smoke Test Postman
         if: ${{ matrix.lane == 'smoke-test-postman' }}
         run: |
           echo "Smoke Test Postman"
           echo "Template only"
-          echo "Later: newman run <collection.json> -e <env.json>"
 
-      - name: API e2e Test (template)
+      - name: API e2e Test
         if: ${{ matrix.lane == 'api-e2e-test' }}
         run: |
           echo "API e2e Test"
           echo "Template only"
-          echo "Later: npm run test:e2e"
 
-  # 6. Deploy to UAT
   deploy-uat:
     name: Deploy to UAT
     runs-on: ubuntu-latest
-    needs: dev-tests-parallel
+    needs: dev-tests
     environment: uat
     steps:
-      - name: Deploy to UAT (template)
+      - name: Deploy to UAT
         run: |
           echo "Deploy to UAT"
           echo "Template only"
-          echo "Later: deploy commands"
 
-  # 7. Parallel: Performance Test + APM Test
-  uat-validations-parallel:
-    name: UAT Validations (Parallel)
+  uat-validations:
+    name: Parallel UAT Validations
     runs-on: ubuntu-latest
     needs: deploy-uat
     strategy:
       fail-fast: false
       matrix:
-        lane: [performance-test, apm-test]
+        lane: ${{ fromJSON(needs.setup-env.outputs.uat_validation_lanes) }}
     steps:
       - name: Lane banner
         run: |
-          echo "UAT validation lane: ${{ matrix.lane }}"
+          echo "Parallel UAT Validations"
+          echo "Lane: ${{ matrix.lane }}"
 
-      - name: Performance Test (template)
+      - name: Performance Test
         if: ${{ matrix.lane == 'performance-test' }}
         run: |
           echo "Performance Test"
           echo "Template only"
-          echo "Later: k6 run <script.js>"
 
-      - name: APM Test (template)
+      - name: APM Test
         if: ${{ matrix.lane == 'apm-test' }}
         run: |
           echo "APM Test"
           echo "Template only"
-          echo "Later: validate APM signals"
 
-  # 8. Deploy to prod
   deploy-prod:
     name: Deploy to prod
     runs-on: ubuntu-latest
-    needs: uat-validations-parallel
+    needs: uat-validations
     environment: prod
     steps:
-      - name: Deploy to prod (template)
+      - name: Deploy to prod
         run: |
           echo "Deploy to prod"
           echo "Template only"
-          echo "Later: deploy commands"
