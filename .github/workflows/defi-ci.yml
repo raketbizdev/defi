@@ -1,183 +1,172 @@
-name: Defi Workflow
+name: Defi CI/CD Workflow
 
 on:
-  workflow_dispatch:
   push:
-    branches: ["dev"]
-    paths-ignore:
-      - "**.md"
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    branches:
+      - dev
 
 jobs:
   setup-env:
-    name: Setup Env
     runs-on: ubuntu-latest
-    outputs:
-      node_versions: ${{ steps.set.outputs.node_versions }}
-      precheck_lanes: ${{ steps.set.outputs.precheck_lanes }}
-      dev_test_lanes: ${{ steps.set.outputs.dev_test_lanes }}
-      uat_validation_lanes: ${{ steps.set.outputs.uat_validation_lanes }}
     steps:
-      - name: Setup placeholders
-        run: |
-          echo "Setup Env"
-          echo "Branch: $GITHUB_REF"
-          echo "Commit: $GITHUB_SHA"
+      - name: Setup environment
+        run: echo "Setup Env"
 
-      - id: set
-        name: Define matrices
-        run: |
-          echo 'node_versions=["20.x"]' >> "$GITHUB_OUTPUT"
-          echo 'precheck_lanes=["upload-static-to-s3","linting","dependency-package-check","unit-test-coverage","db-integration-test"]' >> "$GITHUB_OUTPUT"
-          echo 'dev_test_lanes=["smoke-test-postman","api-e2e-test"]' >> "$GITHUB_OUTPUT"
-          echo 'uat_validation_lanes=["performance-test","apm-test"]' >> "$GITHUB_OUTPUT"
-
-  prechecks:
-    name: Parallel Prechecks
-    runs-on: ubuntu-latest
+  upload-static-to-s3:
+    runs-on: ${{ matrix.os }}
     needs: setup-env
     strategy:
-      fail-fast: false
       matrix:
-        node-version: ${{ fromJSON(needs.setup-env.outputs.node_versions) }}
-        lane: ${{ fromJSON(needs.setup-env.outputs.precheck_lanes) }}
+        os: [ubuntu-latest]
     steps:
-      - name: Checkout
-        run: echo "Checkout repository"
+      - name: Upload static asset 1
+        run: echo "Upload static asset to S3 - step 1"
+      - name: Upload static asset 2
+        run: echo "Upload static asset to S3 - step 2"
+      - name: Upload static asset 3
+        run: echo "Upload static asset to S3 - step 3"
 
-      - name: Setup Node
-        run: echo "Setup Node ${{ matrix.node-version }}"
+  linting:
+    runs-on: ${{ matrix.os }}
+    needs: setup-env
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: Lint step 1
+        run: echo "Linting step 1"
+      - name: Lint step 2
+        run: echo "Linting step 2"
+      - name: Lint step 3
+        run: echo "Linting step 3"
 
-      - name: Lane banner
-        run: |
-          echo "Parallel Prechecks"
-          echo "Lane: ${{ matrix.lane }}"
-          echo "Node: ${{ matrix.node-version }}"
+  dependency-package-check:
+    runs-on: ${{ matrix.os }}
+    needs: setup-env
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: Dependency check step 1
+        run: echo "Dependency check step 1"
+      - name: Dependency check step 2
+        run: echo "Dependency check step 2"
+      - name: Dependency check step 3
+        run: echo "Dependency check step 3"
 
-      - name: Upload Static Asset to S3
-        if: ${{ matrix.lane == 'upload-static-to-s3' }}
-        run: |
-          echo "Upload Static Asset to S3"
-          echo "Template only"
+  unit-test-coverage:
+    runs-on: ${{ matrix.os }}
+    needs: setup-env
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: Unit test step 1
+        run: echo "Unit test coverage step 1"
+      - name: Unit test step 2
+        run: echo "Unit test coverage step 2"
+      - name: Unit test step 3
+        run: echo "Unit test coverage step 3"
 
-      - name: Linting
-        if: ${{ matrix.lane == 'linting' }}
-        run: |
-          echo "Linting"
-          echo "Template only"
-
-      - name: Dependency package Check
-        if: ${{ matrix.lane == 'dependency-package-check' }}
-        run: |
-          echo "Dependency package Check"
-          echo "Template only"
-
-      - name: Unit Test Coverage
-        if: ${{ matrix.lane == 'unit-test-coverage' }}
-        run: |
-          echo "Unit Test Coverage"
-          echo "Template only"
-
-      - name: DB Integration Test
-        if: ${{ matrix.lane == 'db-integration-test' }}
-        run: |
-          echo "DB Integration Test"
-          echo "Template only"
+  db-integration-test:
+    runs-on: ${{ matrix.os }}
+    needs: setup-env
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: DB integration test step 1
+        run: echo "DB integration test step 1"
+      - name: DB integration test step 2
+        run: echo "DB integration test step 2"
+      - name: DB integration test step 3
+        run: echo "DB integration test step 3"
 
   build:
-    name: Build
     runs-on: ubuntu-latest
-    needs: prechecks
+    needs:
+      - upload-static-to-s3
+      - linting
+      - dependency-package-check
+      - unit-test-coverage
+      - db-integration-test
     steps:
-      - name: Build
-        run: |
-          echo "Build"
-          echo "Template only"
+      - name: Build step 1
+        run: echo "Build step 1"
+      - name: Build step 2
+        run: echo "Build step 2"
+      - name: Build step 3
+        run: echo "Build step 3"
 
-  deploy-dev:
-    name: Deploy To Dev
+  deploy-to-dev:
     runs-on: ubuntu-latest
     needs: build
-    environment: dev
     steps:
-      - name: Deploy To Dev
-        run: |
-          echo "Deploy To Dev"
-          echo "Template only"
+      - name: Deploy to dev
+        run: echo "Deploy to Dev"
 
-  dev-tests:
-    name: Parallel Dev Tests
-    runs-on: ubuntu-latest
-    needs: deploy-dev
+  smoke-test-postman:
+    runs-on: ${{ matrix.os }}
+    needs: deploy-to-dev
     strategy:
-      fail-fast: false
       matrix:
-        lane: ${{ fromJSON(needs.setup-env.outputs.dev_test_lanes) }}
+        os: [ubuntu-latest]
     steps:
-      - name: Lane banner
-        run: |
-          echo "Parallel Dev Tests"
-          echo "Lane: ${{ matrix.lane }}"
+      - name: Smoke test step 1
+        run: echo "Smoke test Postman step 1"
+      - name: Smoke test step 2
+        run: echo "Smoke test Postman step 2"
 
-      - name: Smoke Test Postman
-        if: ${{ matrix.lane == 'smoke-test-postman' }}
-        run: |
-          echo "Smoke Test Postman"
-          echo "Template only"
+  api-e2e-test:
+    runs-on: ${{ matrix.os }}
+    needs: deploy-to-dev
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: API e2e step 1
+        run: echo "API e2e test step 1"
+      - name: API e2e step 2
+        run: echo "API e2e test step 2"
 
-      - name: API e2e Test
-        if: ${{ matrix.lane == 'api-e2e-test' }}
-        run: |
-          echo "API e2e Test"
-          echo "Template only"
-
-  deploy-uat:
-    name: Deploy to UAT
+  deploy-to-uat:
     runs-on: ubuntu-latest
-    needs: dev-tests
-    environment: uat
+    needs:
+      - smoke-test-postman
+      - api-e2e-test
     steps:
       - name: Deploy to UAT
-        run: |
-          echo "Deploy to UAT"
-          echo "Template only"
+        run: echo "Deploy to UAT"
 
-  uat-validations:
-    name: Parallel UAT Validations
-    runs-on: ubuntu-latest
-    needs: deploy-uat
+  performance-test:
+    runs-on: ${{ matrix.os }}
+    needs: deploy-to-uat
     strategy:
-      fail-fast: false
       matrix:
-        lane: ${{ fromJSON(needs.setup-env.outputs.uat_validation_lanes) }}
+        os: [ubuntu-latest]
     steps:
-      - name: Lane banner
-        run: |
-          echo "Parallel UAT Validations"
-          echo "Lane: ${{ matrix.lane }}"
+      - name: Performance test step 1
+        run: echo "Performance test step 1"
+      - name: Performance test step 2
+        run: echo "Performance test step 2"
 
-      - name: Performance Test
-        if: ${{ matrix.lane == 'performance-test' }}
-        run: |
-          echo "Performance Test"
-          echo "Template only"
+  apm-test:
+    runs-on: ${{ matrix.os }}
+    needs: deploy-to-uat
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: APM test step 1
+        run: echo "APM test step 1"
+      - name: APM test step 2
+        run: echo "APM test step 2"
 
-      - name: APM Test
-        if: ${{ matrix.lane == 'apm-test' }}
-        run: |
-          echo "APM Test"
-          echo "Template only"
-
-  deploy-prod:
-    name: Deploy to prod
+  deploy-to-prod:
     runs-on: ubuntu-latest
-    needs: uat-validations
-    environment: prod
+    needs:
+      - performance-test
+      - apm-test
     steps:
       - name: Deploy to prod
-        run: |
-          echo "Deploy to prod"
-          echo "Template only"
+        run: echo "Deploy to prod"
