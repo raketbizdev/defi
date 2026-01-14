@@ -1,20 +1,41 @@
-name: CI
+name: Defi Workflow
 
 on:
   push:
-    branches: ["dev"]
-  pull_request:
-    branches: ["dev"]
+    branches:
+      - dev
+  workflow_dispatch:
 
 jobs:
-  build:
+  # Parallel Job 1: Linting
+  linting:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Linting step 1
+        run: echo "Linting step 1"
+      - name: Linting step 2
+        run: echo "Linting step 2"
+      - name: Linting step 3
+        run: echo "Linting step 3"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
+  # Parallel Job 2: Dependency Test
+  dependency-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dependency test step 1
+        run: echo "Dependency test step 1"
+      - name: Dependency test step 2
+        run: echo "Dependency test step 2"
+      - name: Dependency test step 3
+        run: echo "Dependency test step 3"
 
-      - run: npm ci
-      - run: npm test
+  # Parallel Job 3: Unit Test
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Unit test step 1
+        run: echo "Unit test step 1"
+      - name: Unit test step 2
+        run: echo "Unit test step 2"
+      - name: Unit test step 3
+        run: echo "Unit test step 3"
