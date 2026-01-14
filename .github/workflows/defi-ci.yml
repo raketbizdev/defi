@@ -10,6 +10,8 @@ jobs:
   # Parallel Job 1: Linting
   linting:
     runs-on: ubuntu-latest
+    matrix:
+        node-version: [20.x]
     steps:
       - name: Linting step 1
         run: echo "Linting step 1"
@@ -21,6 +23,8 @@ jobs:
   # Parallel Job 2: Dependency Test
   dependency-test:
     runs-on: ubuntu-latest
+    matrix:
+        node-version: [20.x]
     steps:
       - name: Dependency test step 1
         run: echo "Dependency test step 1"
@@ -32,6 +36,8 @@ jobs:
   # Parallel Job 3: Unit Test
   unit-test:
     runs-on: ubuntu-latest
+    matrix:
+        node-version: [20.x]
     steps:
       - name: Unit test step 1
         run: echo "Unit test step 1"
