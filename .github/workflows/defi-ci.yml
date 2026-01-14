@@ -2,60 +2,219 @@ name: Defi Workflow
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, stage, uat, main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 20.x
+
 jobs:
-  # Central place to define node versions once
-  setup-matrix:
+  # 0. Setup Env
+  setup-env:
+    name: Setup Env
     runs-on: ubuntu-latest
-    outputs:
-      node_versions: ${{ steps.set.outputs.node_versions }}
     steps:
-      - id: set
-        run: echo 'node_versions=["20.x"]' >> "$GITHUB_OUTPUT"
+      - name: Setup env placeholders
+        run: |
+          echo "Setup Env"
+          echo "Branch: $GITHUB_REF"
+          echo "Commit: $GITHUB_SHA"
+          echo "Node version (variable): $NODE_VERSION"
 
-  # Parallel Job 1: Linting
-  linting:
+  # 1. Parallel Stage (in the order shown in your diagram)
+  #    Upload Static . Lint . Dependency Check . Unit Test Coverage . DB Integration Test
+  prechecks-parallel:
+    name: Prechecks (Parallel)
     runs-on: ubuntu-latest
-    needs: setup-matrix
+    needs: setup-env
     strategy:
+      fail-fast: false
       matrix:
-        node-version: ${{ fromJSON(needs.setup-matrix.outputs.node_versions) }}
+        lane:
+          - id: upload-static
+            name: "Upload Static Asset to S3"
+            order: 1
+          - id: lint
+            name: "Linting"
+            order: 2
+          - id: dependency
+            name: "Dependency package Check"
+            order: 3
+          - id: unit
+            name: "Unit Test Coverage"
+            order: 4
+          - id: db-integration
+            name: "DB Integration Test"
+            order: 5
     steps:
-      - name: Linting step 1
-        run: echo "Linting step 1 (Node ${{ matrix.node-version }})"
-      - name: Linting step 2
-        run: echo "Linting step 2 (Node ${{ matrix.node-version }})"
-      - name: Linting step 3
-        run: echo "Linting step 3 (Node ${{ matrix.node-version }})"
+      - name: Lane banner
+        run: |
+          echo "Prechecks lane: ${{ matrix.lane.order }} . ${{ matrix.lane.name }}"
+          echo "Lane id: ${{ matrix.lane.id }}"
+          echo "Node version: $NODE_VERSION"
 
-  # Parallel Job 2: Dependency Test
-  dependency-test:
-    runs-on: ubuntu-latest
-    needs: setup-matrix
-    strategy:
-      matrix:
-        node-version: ${{ fromJSON(needs.setup-matrix.outputs.node_versions) }}
-    steps:
-      - name: Dependency test step 1
-        run: echo "Dependency test step 1 (Node ${{ matrix.node-version }})"
-      - name: Dependency test step 2
-        run: echo "Dependency test step 2 (Node ${{ matrix.node-version }})"
-      - name: Dependency test step 3
-        run: echo "Dependency test step 3 (Node ${{ matrix.node-version }})"
+      - name: Upload static asset to S3 (template)
+        if: ${{ matrix.lane.id == 'upload-static' }}
+        run: |
+          echo "Upload Static Asset to S3"
+          echo "Template only . no credentials"
+          echo "Later: aws s3 sync <local_dir> s3://<bucket>/<prefix> --delete"
 
-  # Parallel Job 3: Unit Test
-  unit-test:
+      - name: Linting (template)
+        if: ${{ matrix.lane.id == 'lint' }}
+        run: |
+          echo "Linting"
+          echo "Template only"
+          echo "Later: npm ci"
+          echo "Later: npm run lint"
+
+      - name: Dependency package check (template)
+        if: ${{ matrix.lane.id == 'dependency' }}
+        run: |
+          echo "Dependency package check"
+          echo "Template only"
+          echo "Later: npm ci"
+          echo "Later: npm audit --audit-level=high"
+
+      - name: Unit test coverage (template)
+        if: ${{ matrix.lane.id == 'unit' }}
+        run: |
+          echo "Unit Test Coverage"
+          echo "Template only"
+          echo "Later: npm ci"
+          echo "Later: npm run test:unit"
+          echo "Later: npm run test:coverage"
+
+      - name: DB integration test (template)
+        if: ${{ matrix.lane.id == 'db-integration' }}
+        run: |
+          echo "DB Integration Test"
+          echo "Template only"
+          echo "Later: spin up db service"
+          echo "Later: npm run test:db"
+
+  # 2. Build
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    needs: setup-matrix
-    strategy:
-      matrix:
-        node-version: ${{ fromJSON(needs.setup-matrix.outputs.node_versions) }}
+    needs: prechecks-parallel
+    if: github.ref == 'refs/heads/dev'
     steps:
-      - name: Unit test step 1
-        run: echo "Unit test step 1 (Node ${{ matrix.node-version }})"
-      - name: Unit test step 2
-        run: echo "Unit test step 2 (Node ${{ matrix.node-version }})"
-      - name: Unit test step 3
-        run: echo "Unit test step 3 (Node ${{ matrix.node-version }})"
+      - name: Build placeholders
+        run: |
+          echo "Build"
+          echo "Template only"
+          echo "Later: npm ci"
+          echo "Later: npm run build"
+
+  # 3. Deploy to Dev
+  deploy-dev:
+    name: Deploy To Dev
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/dev'
+    environment: dev
+    steps:
+      - name: Deploy to Dev placeholders
+        run: |
+          echo "Deploy To Dev"
+          echo "Template only"
+          echo "Later: deploy commands"
+
+  # 4. Smoke Test (Postman)
+  smoke-test-postman:
+    name: Smoke Test Postman
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.ref == 'refs/heads/dev'
+    steps:
+      - name: Smoke test placeholders
+        run: |
+          echo "Smoke Test Postman"
+          echo "Template only"
+          echo "Later: newman run <collection.json> -e <env.json>"
+
+  # 5. API e2e Test
+  api-e2e-test:
+    name: API e2e Test
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.ref == 'refs/heads/dev'
+    steps:
+      - name: API e2e placeholders
+        run: |
+          echo "API e2e Test"
+          echo "Template only"
+          echo "Later: npm run test:e2e"
+
+  # 6. Promote dev -> stage only if smoke + api e2e pass
+  promote-to-stage:
+    name: Promote dev to stage
+    runs-on: ubuntu-latest
+    needs: [smoke-test-postman, api-e2e-test]
+    if: github.ref == 'refs/heads/dev'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Promotion placeholders
+        run: |
+          echo "Promote dev -> stage"
+          echo "Template only"
+          echo "Later: create PR dev -> stage or fast-forward merge via API"
+
+  # 7. Deploy to UAT (triggered on push to uat)
+  deploy-uat:
+    name: Deploy To UAT
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/uat'
+    environment: uat
+    steps:
+      - name: Deploy to UAT placeholders
+        run: |
+          echo "Deploy To UAT"
+          echo "Template only"
+          echo "Later: deploy commands"
+
+  # 8. Performance Test (after UAT deploy)
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    needs: deploy-uat
+    if: github.ref == 'refs/heads/uat'
+    steps:
+      - name: Performance test placeholders
+        run: |
+          echo "Performance Test"
+          echo "Template only"
+          echo "Later: k6 run <script.js>"
+
+  # 9. APM Test (after UAT deploy)
+  apm-test:
+    name: APM Test
+    runs-on: ubuntu-latest
+    needs: deploy-uat
+    if: github.ref == 'refs/heads/uat'
+    steps:
+      - name: APM test placeholders
+        run: |
+          echo "APM Test"
+          echo "Template only"
+          echo "Later: validate Datadog / NewRelic signals"
+
+  # 10. Deploy to prod (triggered on push to main)
+  deploy-prod:
+    name: Deploy to prod
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: prod
+    steps:
+      - name: Deploy to prod placeholders
+        run: |
+          echo "Deploy to prod"
+          echo "Template only"
+          echo "Later: deploy commands"
