@@ -2,17 +2,26 @@ name: Defi Workflow
 
 on:
   push:
-    branches:
-      - dev
+    branches: [dev]
   workflow_dispatch:
 
 jobs:
+  # Central place to define node versions once
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      node_versions: ${{ steps.set.outputs.node_versions }}
+    steps:
+      - id: set
+        run: echo 'node_versions=["20.x"]' >> "$GITHUB_OUTPUT"
+
   # Parallel Job 1: Linting
   linting:
     runs-on: ubuntu-latest
+    needs: setup-matrix
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: ${{ fromJSON(needs.setup-matrix.outputs.node_versions) }}
     steps:
       - name: Linting step 1
         run: echo "Linting step 1 (Node ${{ matrix.node-version }})"
@@ -24,9 +33,10 @@ jobs:
   # Parallel Job 2: Dependency Test
   dependency-test:
     runs-on: ubuntu-latest
+    needs: setup-matrix
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: ${{ fromJSON(needs.setup-matrix.outputs.node_versions) }}
     steps:
       - name: Dependency test step 1
         run: echo "Dependency test step 1 (Node ${{ matrix.node-version }})"
@@ -38,9 +48,10 @@ jobs:
   # Parallel Job 3: Unit Test
   unit-test:
     runs-on: ubuntu-latest
+    needs: setup-matrix
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: ${{ fromJSON(needs.setup-matrix.outputs.node_versions) }}
     steps:
       - name: Unit test step 1
         run: echo "Unit test step 1 (Node ${{ matrix.node-version }})"
